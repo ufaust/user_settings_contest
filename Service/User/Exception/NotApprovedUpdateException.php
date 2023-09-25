@@ -2,9 +2,6 @@
 
 namespace App\Service\User\Exception;
 
-use Throwable;
-
-class NotApprovedUpdateException extends \Exception
+class NotApprovedUpdateException extends Base2faException
 {
-
 }

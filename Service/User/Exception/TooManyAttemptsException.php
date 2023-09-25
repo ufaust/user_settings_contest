@@ -2,8 +2,6 @@
 
 namespace App\Service\User\Exception;
 
-use Throwable;
-
-class TooManyAttemptsException extends \Exception
+class TooManyAttemptsException extends Base2faException
 {
 }

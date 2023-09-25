@@ -3,7 +3,6 @@
 namespace App\AbstractVendor\Http;
 
 use App\AbstractVendor\Form\FormInterface;
-use App\AbstractVendor\Form\TypeInterface;
 
 class AbstractController
 {
@@ -11,6 +10,12 @@ class AbstractController
     {
         return new class() implements FormInterface {
             public function handleRequest(Request $request): void {}
+
+            public function get(string $key): mixed {}
+
         };
     }
+
+    public function redirectToRoute(string $route): Response {}
+
 }

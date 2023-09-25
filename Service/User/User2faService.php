@@ -6,60 +6,60 @@ use App\AbstractVendor\SomeTools\HasherInterface;
 use App\Entity\User;
 use App\Service\Cache\CacheInterface;
 use App\Service\Message\MessengerInterface;
-use App\Service\User\Exception\AttemptsTimeLimitException;
+use App\Service\User\DTO\TwoFAValidationDTO;
+use App\Service\User\Exception\IncorrectValidationKeyException;
 use App\Service\User\Exception\TooManyAttemptsException;
 
 class User2faService
 {
-    public const ATTEMPTS_COUNT = 5;
-    public const ATTEMPTS_TIMER = 60;
-
     public function __construct(
         private CacheInterface $cacheService,
         private MessengerInterface $messenger,
         private HasherInterface $hasher,
     ) {}
 
-    public function isApprove(int $userId): bool
+    public function isApprove(User $user): bool
     {
-        $cacheUserData = $this->cacheService->get($userId);
+        $cacheUserData = $this->cacheService->get($user->id);
 
-        if (array_key_exists('validation_key', $cacheUserData['2FA']['attempts'])) {
+        if (array_key_exists('2FA', $cacheUserData)) {
+            $this->makeAttempt($user);
+
             return false;
         }
 
-        return true;
+        return TwoFAValidationDTO::castFromArray($cacheUserData['2FA'])->approved;
     }
 
-    public function validate(int $userId, string $validationKey): bool
+    public function validate(User $user, string $validationKey)
     {
-        $cacheUserData = $this->cacheService->get($userId);
-        if ($cacheUserData[User::CACHE_2FA_VALIDATION]['attempts']['count'] > self::ATTEMPTS_COUNT) {
+        $cacheUserData = $this->cacheService->get($user->id);
+        $validation = TwoFAValidationDTO::castFromArray($cacheUserData['2FA']);
+
+        if ($validation->count > TwoFAValidationDTO::ATTEMPTS_COUNT) {
             throw new TooManyAttemptsException("Too many attempts!");
         }
 
-        if ($cacheUserData[User::CACHE_2FA_VALIDATION]['attempts']['last_try'] - time() < self::ATTEMPTS_TIMER ) {
-            throw new AttemptsTimeLimitException("Wait for " . self::ATTEMPTS_TIMER . " seconds for next attempt");
+        if ($validation->lastTry - time() < TwoFAValidationDTO::ATTEMPTS_TIMER ) {
+            throw new IncorrectValidationKeyException("Wait for " . TwoFAValidationDTO::ATTEMPTS_TIMER . " seconds for next attempt");
         }
 
-        if ($cacheUserData[User::CACHE_2FA_VALIDATION]['attempts']['validation_key'] !== $validationKey) {
-            return false;
+        if ($validation->validationKey !== $validationKey) {
+            throw new IncorrectValidationKeyException("Incorrect validation key!");
         }
 
-        return true;
+        $validation->approved = true;
+        $this->cacheService->set($user->id, $validation->toArray());
     }
 
-    public function makeAttempt(User $user): array
+    public function makeAttempt(User $user): void
     {
-        $cacheUserData = $this->cacheService->get($user->id);
-        $cacheUserData['2FA']['attempts']['count'] = 1;
-        $cacheUserData['2FA']['attempts']['last_try'] = time();
-        $cacheUserData['2FA']['attempts']['validation_key'] = $this->hasher->makeHash();
+        $validation = new TwoFAValidationDTO(
+            count: 1, validationKey: $this->hasher->makeHash(), lastTry: time()
+        );
 
-        $this->cacheService->set($user->id, $cacheUserData);
-        $this->messenger->send($user, $cacheUserData['2FA']['attempts']['validation_key']);
-
-        return $cacheUserData['2FA']['attempts'];
+        $this->cacheService->set($user->id, $validation->toArray());
+        $this->messenger->send($user, $validation->validationKey);
     }
 
     public function updateAttempt(int $userId): void

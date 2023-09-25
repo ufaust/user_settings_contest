@@ -2,7 +2,7 @@
 
 namespace App\AbstractVendor\Http;
 
-class JsonResponse
+class JsonResponse implements Response
 {
 
 }

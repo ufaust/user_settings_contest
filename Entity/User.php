@@ -4,7 +4,11 @@ namespace App\Entity;
 
 use App\AbstractVendor\ORM\EntityInterface;
 
-readonly class User implements EntityInterface
+/**
+ * Class User
+ * @method set($key, $value)
+ */
+class User implements EntityInterface
 {
     public function __construct(
         public int $id,
